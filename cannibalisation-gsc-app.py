@@ -97,8 +97,22 @@ def get_all_keywords_cannibalization(df, min_impressions=10, min_urls=2):
     # Calculer les statistiques pour chaque mot-clé cannibalisé
     results = []
     for keyword in cannibalized_keywords['query'].tolist():
-        _, stats = analyze_cannibalization(filtered_df, keyword)
+        urls_data, stats = analyze_cannibalization(filtered_df, keyword)
         if stats:
+            # Ajouter les URLs associées à ce mot-clé
+            top_urls = urls_data['page'].tolist()
+            stats['top_urls'] = top_urls  # Toutes les URLs
+            stats['top_url'] = top_urls[0] if top_urls else ""  # URL principale
+            stats['secondary_urls'] = top_urls[1:3] if len(top_urls) > 1 else []  # 2 URLs secondaires principales
+            
+            # Créer une chaîne avec les URLs principales pour l'affichage
+            if len(top_urls) > 0:
+                stats['urls_display'] = top_urls[0]
+                if len(top_urls) > 1:
+                    stats['urls_display'] += f" + {len(top_urls)-1} autre(s)"
+            else:
+                stats['urls_display'] = ""
+                
             results.append(stats)
     
     if results:
@@ -191,8 +205,16 @@ if uploaded_file is not None:
             st.subheader("Tableau des mots-clés cannibalisés")
             display_df = all_cannibalization.copy()
             display_df['top_url_percentage'] = display_df['top_url_percentage'].round(2).astype(str) + '%'
+            
+            # Ajouter les colonnes d'URLs
+            display_columns = ['keyword', 'total_urls', 'total_impressions', 
+                              'top_url_percentage', 'cannibalization_score',
+                              'top_url', 'urls_display']
+            
+            display_df = display_df[display_columns]
             display_df.columns = ['Mot-clé', 'Nombre d\'URLs', 'Impressions totales', 
-                                  '% URL principale', 'Score de cannibalisation']
+                                '% URL principale', 'Score de cannibalisation', 
+                                'URL principale', 'URLs en compétition']
             st.dataframe(display_df)
         else:
             st.info("Aucun mot-clé cannibalisé n'a été trouvé avec les critères actuels.")
@@ -280,8 +302,19 @@ if uploaded_file is not None:
             
             # Renommer les colonnes pour l'export
             export_df = all_cannibalization.copy()
+            
+            # Ajouter une colonne pour les URLs secondaires (top 2 suivantes)
+            export_df['URLs secondaires'] = export_df['secondary_urls'].apply(lambda x: ', '.join(x) if x else '')
+            
+            # Sélectionner et renommer les colonnes
+            export_columns = ['keyword', 'total_urls', 'total_impressions', 
+                             'top_url_percentage', 'cannibalization_score', 'description',
+                             'top_url', 'URLs secondaires']
+            
+            export_df = export_df[export_columns]
             export_df.columns = ['Mot-clé', 'Nombre d\'URLs', 'Impressions totales', 
-                               '% URL principale', 'Score (1-5)', 'Niveau de cannibalisation']
+                               '% URL principale', 'Score (1-5)', 'Niveau de cannibalisation',
+                               'URL principale', 'URLs secondaires']
             
             st.markdown(create_download_link(export_df, "analyse_cannibalisation.csv"), unsafe_allow_html=True)
             st.dataframe(export_df)
